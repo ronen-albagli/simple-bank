@@ -92,12 +92,16 @@ func (r *MongoRepo) FindOne(entityId string) (*domain.Ledger, error) {
 	return ledger, nil
 }
 
-func (r *MongoRepo) FindAll() ([]*domain.Ledger, error) {
+func (r *MongoRepo) FindAll(entityId string) ([]*domain.Ledger, error) {
 
 	var items []*domain.Ledger
 
+	findOptions := options.Find()
+
+	findOptions.SetSort(bson.D{{"_id", 1}})
+
 	collection := r.client.Database(r.db).Collection("ledger")
-	cur, err := collection.Find(context.Background(), bson.D{})
+	cur, err := collection.Find(context.Background(), bson.M{"entityId": entityId}, findOptions)
 
 	if err != nil {
 		log.Fatal(err)

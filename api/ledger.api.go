@@ -5,7 +5,7 @@ import (
 )
 
 func LedgerRoutes(router *gin.Engine) {
-	// router.GET("/ledger", HandleNewAssetInsertion())
+	router.GET("/ledger", getLedgerBalance())
 	router.POST("/ledger", HandleNewAssetInsertion())
 	// router.GET("/user/:email", controllers.GetUser())    //add this
 	// router.PUT("/user/:userId", controllers.EditAUser()) //add this

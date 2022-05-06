@@ -10,11 +10,17 @@ type Ledger struct {
 }
 
 type Repository interface {
-	FindOne(code string) (*Ledger, error)
-	Insert(product *Ledger) error
+	FindOne(entityId string) (*Ledger, error)
+	Insert(ledger *Ledger) error
 	// Update(product *Ledger) error
-	FindAll() ([]*Ledger, error)
-	Delete(code string) error
+	FindAll(entityId string) ([]*Ledger, error)
+	Delete(entityId string) error
+}
+
+type Balance struct {
+	Total     int
+	Used      int
+	Available int
 }
 
 type Service struct {
@@ -32,4 +38,41 @@ func (s *Service) InsertNewLedgerAsset(ledger *Ledger) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *Service) GetLedgerBalance(entityId string) (Balance, error) {
+	events, err := s.ledgerRepo.FindAll(entityId)
+
+	balance := ApplyEvents(events)
+
+	if err != nil {
+		return balance, err
+	}
+
+	return balance, err
+}
+
+func ApplyEvents(events []*Ledger) Balance {
+	var balance Balance
+
+	balance.Total = 0
+	balance.Used = 0
+	balance.Available = 0
+
+	for _, event := range events {
+		switch event.EventType {
+		case "GRANT":
+			{
+				balance.Total += event.Amount
+			}
+		case "USE":
+			{
+				balance.Used += event.Amount
+			}
+		}
+	}
+
+	balance.Available = balance.Total - balance.Used
+
+	return balance
 }
