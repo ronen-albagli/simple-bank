@@ -1,10 +1,12 @@
 package domain
 
+import "time"
+
 type Ledger struct {
 	EntityId       string `json:"entityId" validate:"required" bson:"entityId"`
-	TimelineSerial int64  `json:"timelineSerial" validate:"required" bson:"timelineSerial"`
+	TimelineSerial int64  `json:"timelineSerial" bson:"timelineSerial"`
 	Amount         int    `json:"amount" validate:"required" bson:"amount"`
-	Timestamp      int64  `json:"timestamp" validate:"required" bson:"timestamp"`
+	Timestamp      int64  `json:"timestamp" bson:"timestamp"`
 	EventType      string `json:"eventType" validate:"required" bson:"eventType"`
 	Event          string `json:"event" validate:"required" bson:"event`
 }
@@ -24,7 +26,11 @@ type Balance struct {
 }
 
 type Service struct {
-	ledgerRepo Repository
+	ledgerRepo   Repository
+	events       []*Ledger
+	totalCredits int
+	totalUsed    int
+	TLE          int
 }
 
 func InitLedgerService(ledgerRepo Repository) *Service {
@@ -32,6 +38,15 @@ func InitLedgerService(ledgerRepo Repository) *Service {
 }
 
 func (s *Service) InsertNewLedgerAsset(ledger *Ledger) (bool, error) {
+	balance, _ := s.GetLedgerBalance(ledger.EntityId)
+
+	if ledger.EventType == "USE" && balance.Available < ledger.Amount {
+		return false, nil
+	}
+
+	ledger.TimelineSerial = int64(s.TLE) + 1
+	ledger.Timestamp = time.Now().UTC().UnixNano() / 1000
+
 	err := s.ledgerRepo.Insert(ledger)
 
 	if err != nil {
@@ -42,8 +57,11 @@ func (s *Service) InsertNewLedgerAsset(ledger *Ledger) (bool, error) {
 
 func (s *Service) GetLedgerBalance(entityId string) (Balance, error) {
 	events, err := s.ledgerRepo.FindAll(entityId)
+	s.events = events
 
-	balance := ApplyEvents(events)
+	s.ApplyEvents()
+
+	balance := s.CalculateBalance()
 
 	if err != nil {
 		return balance, err
@@ -52,27 +70,29 @@ func (s *Service) GetLedgerBalance(entityId string) (Balance, error) {
 	return balance, err
 }
 
-func ApplyEvents(events []*Ledger) Balance {
+func (s *Service) CalculateBalance() Balance {
 	var balance Balance
 
-	balance.Total = 0
-	balance.Used = 0
-	balance.Available = 0
+	balance.Total = s.totalCredits
+	balance.Used = s.totalUsed
+	balance.Available = s.totalCredits - s.totalUsed
 
-	for _, event := range events {
+	return balance
+}
+
+func (s *Service) ApplyEvents() {
+	for _, event := range s.events {
 		switch event.EventType {
 		case "GRANT":
 			{
-				balance.Total += event.Amount
+				s.totalCredits += event.Amount
+				s.TLE = int(event.TimelineSerial)
 			}
 		case "USE":
 			{
-				balance.Used += event.Amount
+				s.totalUsed += event.Amount
+				s.TLE = int(event.TimelineSerial)
 			}
 		}
 	}
-
-	balance.Available = balance.Total - balance.Used
-
-	return balance
 }

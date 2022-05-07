@@ -35,7 +35,13 @@ func HandleNewAssetInsertion() gin.HandlerFunc {
 
 		service := domain.InitLedgerService(repo)
 
-		service.InsertNewLedgerAsset(&ledgerAssets)
+		status, _ := service.InsertNewLedgerAsset(&ledgerAssets)
+
+		if !status {
+			c.JSON(http.StatusBadRequest, "{msg: Failed to make this transaction}")
+
+			return
+		}
 
 		c.JSON(http.StatusCreated, "{}")
 	}
